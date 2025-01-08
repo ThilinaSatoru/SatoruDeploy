@@ -1,0 +1,44 @@
+name: Deploy to AWS EC2 with Ngrok
+
+on:
+  push:
+    branches:
+      - main  # Deploy when changes are pushed to the main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Install SSH Key
+      run: |
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ec2_key.pem
+        chmod 600 ec2_key.pem
+
+    - name: Deploy to EC2 and Setup Ngrok
+      run: |
+        ssh -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+        set -e
+        # Navigate to the application path
+        cd ${{ secrets.APP_PATH }} || mkdir -p ${{ secrets.APP_PATH }} && cd ${{ secrets.APP_PATH }}
+
+        # Pull latest changes and install dependencies
+        git reset --hard
+        git pull
+        npm install
+
+        # Restart the application using PM2
+        pm2 stop all || true
+        pm2 start index.js --name "nest-app"
+        pm2 save
+
+        # Start or restart Ngrok for port 3000
+        pm2 delete ngrok || true
+        pm2 start --name ngrok -- ngrok http 3000
+
+        # Save the PM2 configuration to persist Ngrok after reboot
+        pm2 save
+        EOF
