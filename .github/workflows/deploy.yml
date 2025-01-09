@@ -1,0 +1,41 @@
+name: Deploy to AWS EC2 with PM2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Install SSH Key
+      run: |
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ec2_key.pem
+        chmod 600 ec2_key.pem
+
+    - name: Add EC2 Host to Known Hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Deploy to EC2 and Start App
+      run: |
+        ssh -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+        set -e
+        cd ${{ secrets.APP_PATH }} || mkdir -p ${{ secrets.APP_PATH }} && cd ${{ secrets.APP_PATH }}
+        if [ ! -d ".git" ]; then
+          git clone https://github.com/${{ github.repository }} .
+        fi
+        git reset --hard
+        git pull
+        npm install
+        cd /home/admin/pm2
+        export NGROK_AUTHTOKEN=${{ secrets.NGROK_AUTHTOKEN }}
+        pm2 startOrRestart ecosystem.config.js
+        pm2 save
+        EOF
