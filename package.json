@@ -10,6 +10,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "express": "^4.21.2"
+    "dockerode": "^4.0.3",
+    "express": "^4.21.2",
+    "os-utils": "^0.0.14",
+    "pm2": "^5.4.3"
   }
 }
